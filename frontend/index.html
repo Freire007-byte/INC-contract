@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INC Network — Proof of Signal</title>
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js" type="application/javascript"></script>
+  <style>
+    :root {
+      --bg:        #0a0b0f;
+      --card:      #12141a;
+      --border:    #1e2028;
+      --primary:   #6c63ff;
+      --green:     #00d48a;
+      --red:       #ff4757;
+      --yellow:    #ffd32a;
+      --text:      #e8eaf0;
+      --muted:     #6b7280;
+      --radius:    12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* ── HEADER ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      background: var(--card); position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+    .logo span { color: var(--primary); }
+    .header-stats { display: flex; gap: 24px; font-size: 13px; color: var(--muted); }
+    .header-stats b { color: var(--text); }
+    #btn-connect {
+      background: var(--primary); color: #fff; border: none; border-radius: 8px;
+      padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: opacity .2s;
+    }
+    #btn-connect:hover { opacity: .85; }
+    #btn-connect.connected { background: var(--border); color: var(--muted); }
+
+    /* ── ALERT ── */
+    #alert {
+      display: none; margin: 16px 24px; padding: 12px 16px;
+      border-radius: var(--radius); font-size: 14px; font-weight: 500;
+    }
+    #alert.success { background: #00d48a22; border: 1px solid var(--green); color: var(--green); }
+    #alert.error   { background: #ff475722; border: 1px solid var(--red);   color: var(--red);   }
+    #alert.info    { background: #6c63ff22; border: 1px solid var(--primary); color: var(--primary); }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: 4px; padding: 20px 24px 0; }
+    .tab {
+      padding: 10px 20px; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: 600;
+      cursor: pointer; color: var(--muted); background: transparent; border: none;
+      border-bottom: 2px solid transparent; transition: all .2s;
+    }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #6c63ff11; }
+    .tab:hover:not(.active) { color: var(--text); }
+
+    /* ── SECTIONS ── */
+    .section { display: none; padding: 24px; }
+    .section.active { display: block; }
+
+    /* ── CARDS ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; transition: border-color .2s;
+    }
+    .card:hover { border-color: #2e3040; }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .pair { font-size: 18px; font-weight: 700; }
+    .badge {
+      padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+    }
+    .badge.long  { background: #00d48a22; color: var(--green); }
+    .badge.short { background: #ff475722; color: var(--red); }
+    .badge.win   { background: #00d48a22; color: var(--green); }
+    .badge.loss  { background: #ff475722; color: var(--red); }
+    .badge.open  { background: #6c63ff22; color: var(--primary); }
+    .badge.expired { background: #ffd32a22; color: var(--yellow); }
+
+    .price-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .price-item { background: #0a0b0f; border-radius: 8px; padding: 10px; text-align: center; }
+    .price-item label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+    .price-item span { font-size: 14px; font-weight: 600; }
+    .price-item .tp   { color: var(--green); }
+    .price-item .sl   { color: var(--red); }
+    .price-item .entry { color: var(--text); }
+
+    .card-meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .card-meta b { color: var(--text); }
+
+    .rsi-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 16px; }
+    .rsi-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+
+    .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      border: none; cursor: pointer; transition: opacity .2s; flex: 1;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: var(--primary); color: #fff; }
+    .btn-green    { background: var(--green);   color: #000; }
+    .btn-outline  { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-red      { background: var(--red); color: #fff; }
+
+    /* ── FORM ── */
+    .form-card { max-width: 520px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
+    .form-title { font-size: 18px; font-weight: 700; margin-bottom: 24px; }
+    .form-row { margin-bottom: 18px; }
+    .form-row label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+    .form-row input, .form-row select {
+      width: 100%; background: #0a0b0f; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; color: var(--text); font-size: 14px; outline: none;
+      transition: border-color .2s;
+    }
+    .form-row input:focus, .form-row select:focus { border-color: var(--primary); }
+    .form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+    .form-fee-info {
+      background: #6c63ff11; border: 1px solid #6c63ff33; border-radius: 8px;
+      padding: 12px 16px; font-size: 13px; color: var(--muted); margin-bottom: 20px;
+    }
+    .form-fee-info b { color: var(--primary); }
+
+    /* ── POSIÇÕES ── */
+    .position-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px; margin-bottom: 10px;
+    }
+    .position-info { flex: 1; }
+    .position-info .pair-label { font-weight: 700; margin-bottom: 4px; }
+    .position-info .pos-detail { font-size: 13px; color: var(--muted); }
+
+    /* ── SACAR ── */
+    .withdraw-card {
+      max-width: 420px; background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px; text-align: center;
+    }
+    .withdraw-amount { font-size: 36px; font-weight: 800; color: var(--green); margin: 16px 0; }
+    .withdraw-label  { font-size: 14px; color: var(--muted); }
+
+    /* ── EMPTY ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* ── LOADING ── */
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { display: inline-block; width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+
+    /* ── NETWORK BADGE ── */
+    .network-badge { font-size: 12px; padding: 3px 8px; border-radius: 4px; background: #ffd32a22; color: var(--yellow); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">INC <span>NETWORK</span></div>
+  <div class="header-stats">
+    <div>Sinais: <b id="stat-signals">—</b></div>
+    <div>Volume: <b id="stat-volume">—</b></div>
+    <div>Taxas: <b id="stat-fees">—</b></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="network-badge" id="network-name">Sepolia</span>
+    <button id="btn-connect" onclick="connectWallet()">Conectar Carteira</button>
+  </div>
+</header>
+
+<!-- ── ALERT ── -->
+<div id="alert"></div>
+
+<!-- ── TABS ── -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('sinais')">Sinais Abertos</button>
+  <button class="tab" onclick="switchTab('criar')">Criar Sinal</button>
+  <button class="tab" onclick="switchTab('posicoes')">Minhas Posições</button>
+  <button class="tab" onclick="switchTab('sacar')">Sacar</button>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- TAB: SINAIS ABERTOS                       -->
+<!-- ══════════════════════════════════════════ -->
+<div id="tab-sinais" class="section active">
+  <div id="signals-list" class="grid">
+    <div class="loading"><div class="spinner"></div><p style="margin-top:12px">Conecte a carteira para ver os sinais</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- TAB: CRIAR SINAL                          -->
+<!-- ══════════════════════════════════════════ -->
+<div id="tab-criar" class="section">
+  <div class="form-card">
+    <div class="form-title">Publicar Novo Sinal</div>
+
+    <div class="form-fee-info">
+      Taxa da rede: <b>1.5%</b> do seu stake vai para a treasury INC. O restante é apostado.
+    </div>
+
+    <div class="form-row">
+      <label>Par de Moedas</label>
+      <select id="f-pair">
+        <option value="BTC/USDT">BTC/USDT</option>
+        <option value="ETH/USDT">ETH/USDT</option>
+        <option value="SOL/USDT">SOL/USDT</option>
+        <option value="BNB/USDT">BNB/USDT</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>Direção</label>
+      <select id="f-direction">
+        <option value="0">LONG (preço vai subir)</option>
+        <option value="1">SHORT (preço vai cair)</option>
+      </select>
+    </div>
+
+    <div class="form-2col">
+      <div class="form-row">
+        <label>Preço de Entrada (USD)</label>
+        <input type="number" id="f-entry" placeholder="65000" step="0.01" />
+      </div>
+      <div class="form-row">
+        <label>RSI (0–100)</label>
+        <input type="number" id="f-rsi" placeholder="28" min="0" max="100" />
+      </div>
+    </div>
+
+    <div class="form-2col">
+      <div class="form-row">
+        <label>Take Profit (USD)</label>
+        <input type="number" id="f-tp" placeholder="68000" step="0.01" />
+        <div class="form-hint">LONG: maior que entrada · SHORT: menor</div>
+      </div>
+      <div class="form-row">
+        <label>Stop Loss (USD)</label>
+        <input type="number" id="f-sl" placeholder="62000" step="0.01" />
+        <div class="form-hint">LONG: menor que entrada · SHORT: maior</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Stake (ETH) — mínimo 0.005</label>
+      <input type="number" id="f-stake" placeholder="0.01" step="0.001" min="0.005" />
+    </div>
+
+    <button class="btn btn-primary" style="width:100%" onclick="createSignal()">Publicar Sinal</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- TAB: MINHAS POSIÇÕES                      -->
+<!-- ══════════════════════════════════════════ -->
+<div id="tab-posicoes" class="section">
+  <div id="positions-list">
+    <div class="loading"><p style="color:var(--muted)">Conecte a carteira para ver suas posições</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- TAB: SACAR                                -->
+<!-- ══════════════════════════════════════════ -->
+<div id="tab-sacar" class="section">
+  <div class="withdraw-card">
+    <div class="withdraw-label">Saldo disponível para saque</div>
+    <div class="withdraw-amount" id="pending-amount">0.0000 ETH</div>
+    <div style="color:var(--muted);font-size:13px;margin-bottom:24px">
+      Recompensas de sinais LOSS e stakes devolvidos de sinais EXPIRED
+    </div>
+    <button class="btn btn-green" style="width:100%" onclick="withdraw()" id="btn-withdraw" disabled>
+      Sacar ETH
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- MODAL: FOLLOW SIGNAL                      -->
+<!-- ══════════════════════════════════════════ -->
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:#000a;z-index:200;display:none;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:360px">
+    <div style="font-size:17px;font-weight:700;margin-bottom:20px">Seguir Sinal <span id="modal-signal-id"></span></div>
+    <div style="font-size:14px;color:var(--muted);margin-bottom:16px">
+      Par: <b id="modal-pair" style="color:var(--text)"></b> &nbsp;|&nbsp;
+      Direção: <b id="modal-direction" style="color:var(--text)"></b>
+    </div>
+    <div class="form-row">
+      <label>Stake (ETH) — mínimo 0.001</label>
+      <input type="number" id="modal-stake" placeholder="0.01" step="0.001" min="0.001" />
+    </div>
+    <div class="form-fee-info" style="margin-bottom:20px">
+      Taxa de <b>1.5%</b> deduzida automaticamente do seu stake.
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-outline" style="flex:1" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" style="flex:1" onclick="confirmFollow()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIGURAÇÃO — altere após o deploy real
+// ══════════════════════════════════════════════
+const CONFIG = {
+  CONTRACT_ADDRESS: "0x83F723a613a47cE2F0FB805bCA71C4AAA2F8d9EC", // endereço do deploy
+  CHAIN_ID:         11155111, // Sepolia
+  CHAIN_NAME:       "Sepolia",
+};
+
+const ABI = [
+  // Views
+  "function totalSignals() view returns (uint256)",
+  "function openSignalsCount() view returns (uint256)",
+  "function networkStats() view returns (uint256,uint256,uint256,uint256,uint256)",
+  "function getSignal(uint256) view returns (tuple(uint256 id,address provider,string pair,uint8 direction,uint256 entryPrice,uint256 targetPrice,uint256 stopPrice,uint256 providerStake,uint256 followersStake,uint256 createdAt,uint256 resolvedAt,uint8 status,uint256 rsi,uint256 totalPoolAtResolution,address priceFeed))",
+  "function getPosition(uint256,address) view returns (tuple(uint256 amount,bool claimed))",
+  "function pendingWithdrawal(address) view returns (uint256)",
+  "function getCurrentPrice(string) view returns (uint256)",
+  "function getWinRate(address) view returns (uint256)",
+  "function followerCount(uint256) view returns (uint256)",
+  // Transactions
+  "function createSignal(string,uint8,uint256,uint256,uint256,uint256) payable returns (uint256)",
+  "function followSignal(uint256) payable",
+  "function resolveByOracle(uint256)",
+  "function claimReward(uint256)",
+  "function claimExpired(uint256)",
+  "function withdraw()",
+];
+
+// ══════════════════════════════════════════════
+// ESTADO
+// ══════════════════════════════════════════════
+let provider, signer, contract, userAddress;
+let pendingFollowId = null;
+
+const STATUS_LABEL = ["Aberto", "WIN", "LOSS", "Expirado"];
+const STATUS_CLASS  = ["open",   "win", "loss", "expired"];
+const DIR_LABEL     = ["LONG", "SHORT"];
+
+// ══════════════════════════════════════════════
+// UTILITÁRIOS
+// ══════════════════════════════════════════════
+const fmt  = n => `$${(Number(n) / 1e8).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtE = n => `${parseFloat(ethers.utils.formatEther(n)).toFixed(4)} ETH`;
+const toPrice = v => ethers.BigNumber.from(Math.round(parseFloat(v) * 1e8).toString());
+
+function showAlert(msg, type = "info") {
+  const el = document.getElementById("alert");
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = "block";
+  setTimeout(() => el.style.display = "none", 6000);
+}
+
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((t, i) => {
+    const names = ["sinais","criar","posicoes","sacar"];
+    t.classList.toggle("active", names[i] === name);
+  });
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.getElementById(`tab-${name}`).classList.add("active");
+  if (name === "sinais")   loadSignals();
+  if (name === "posicoes") loadPositions();
+  if (name === "sacar")    loadWithdrawal();
+}
+
+// ══════════════════════════════════════════════
+// CARTEIRA
+// ══════════════════════════════════════════════
+async function connectWallet() {
+  if (!window.ethereum) return showAlert("MetaMask não encontrada. Instale em metamask.io", "error");
+  try {
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+
+    const network = await provider.getNetwork();
+    if (network.chainId !== CONFIG.CHAIN_ID) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x" + CONFIG.CHAIN_ID.toString(16) }],
+        });
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+      } catch {
+        return showAlert(`Troque para a rede ${CONFIG.CHAIN_NAME} no MetaMask`, "error");
+      }
+    }
+
+    signer      = provider.getSigner();
+    userAddress = await signer.getAddress();
+    contract    = new ethers.Contract(CONFIG.CONTRACT_ADDRESS, ABI, signer);
+
+    const btn = document.getElementById("btn-connect");
+    btn.textContent = userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
+    btn.classList.add("connected");
+
+    await loadStats();
+    await loadSignals();
+
+    showAlert("Carteira conectada com sucesso!", "success");
+
+    window.ethereum.on("accountsChanged", () => location.reload());
+    window.ethereum.on("chainChanged",    () => location.reload());
+  } catch (e) {
+    showAlert(e.message || "Erro ao conectar", "error");
+  }
+}
+
+// ══════════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════════
+async function loadStats() {
+  try {
+    const [total, vol, fees] = await contract.networkStats();
+    document.getElementById("stat-signals").textContent = total.toString();
+    document.getElementById("stat-volume").textContent  = parseFloat(ethers.utils.formatEther(vol)).toFixed(3) + " ETH";
+    document.getElementById("stat-fees").textContent    = parseFloat(ethers.utils.formatEther(fees)).toFixed(4) + " ETH";
+  } catch {}
+}
+
+// ══════════════════════════════════════════════
+// SINAIS
+// ══════════════════════════════════════════════
+async function loadSignals() {
+  if (!contract) return;
+  const list = document.getElementById("signals-list");
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  try {
+    const total = (await contract.totalSignals()).toNumber();
+    if (total === 0) {
+      list.innerHTML = '<div class="empty"><div class="empty-icon">📡</div><p>Nenhum sinal criado ainda.<br>Seja o primeiro provider!</p></div>';
+      return;
+    }
+
+    const signals = [];
+    for (let i = total; i >= Math.max(1, total - 19); i--) {
+      try { signals.push(await contract.getSignal(i)); } catch {}
+    }
+
+    list.innerHTML = "";
+    for (const sig of signals) {
+      list.appendChild(buildSignalCard(sig));
+    }
+  } catch (e) {
+    list.innerHTML = `<div class="empty"><p style="color:var(--red)">Erro ao carregar sinais: ${e.message}</p></div>`;
+  }
+}
+
+function buildSignalCard(sig) {
+  const isOpen     = sig.status === 0;
+  const isLoss     = sig.status === 2;
+  const isExpired  = sig.status === 3;
+  const isLong     = sig.direction === 0;
+  const pool       = sig.providerStake.add(sig.followersStake);
+  const followers  = sig.followersStake.gt(0) ? "+" : "";
+  const expires    = new Date(sig.createdAt.toNumber() * 1000 + 7 * 86400000);
+  const isProvider = userAddress && sig.provider.toLowerCase() === userAddress.toLowerCase();
+
+  const rsiColor = sig.rsi < 30 ? "var(--green)" : sig.rsi > 70 ? "var(--red)" : "var(--yellow)";
+
+  const div = document.createElement("div");
+  div.className = "card";
+  div.innerHTML = `
+    <div class="card-header">
+      <div>
+        <div class="pair">${sig.pair}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">
+          Provider: ${sig.provider.slice(0,6)}...${sig.provider.slice(-4)}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-direction:column;align-items:flex-end">
+        <span class="badge ${isLong ? "long" : "short"}">${DIR_LABEL[sig.direction]}</span>
+        <span class="badge ${STATUS_CLASS[sig.status]}">${STATUS_LABEL[sig.status]}</span>
+      </div>
+    </div>
+
+    <div class="price-row">
+      <div class="price-item">
+        <label>Entrada</label>
+        <span class="entry">${fmt(sig.entryPrice)}</span>
+      </div>
+      <div class="price-item">
+        <label>Take Profit</label>
+        <span class="tp">${fmt(sig.targetPrice)}</span>
+      </div>
+      <div class="price-item">
+        <label>Stop Loss</label>
+        <span class="sl">${fmt(sig.stopPrice)}</span>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span style="color:var(--muted)">RSI: <b style="color:${rsiColor}">${sig.rsi}</b></span>
+        <span style="color:var(--muted)">Pool: <b style="color:var(--text)">${fmtE(pool)}</b></span>
+      </div>
+      <div class="rsi-bar"><div class="rsi-fill" style="width:${sig.rsi}%;background:${rsiColor}"></div></div>
+    </div>
+
+    <div class="card-meta">
+      <span>Stake provider: <b>${fmtE(sig.providerStake)}</b></span>
+      ${isOpen ? `<span>Expira: <b>${expires.toLocaleDateString("pt-BR")}</b></span>` : `<span>Resolvido: <b>${new Date(sig.resolvedAt.toNumber()*1000).toLocaleDateString("pt-BR")}</b></span>`}
+    </div>
+
+    <div class="card-actions">
+      ${isOpen && !isProvider ? `
+        <button class="btn btn-primary" onclick="openFollowModal(${sig.id}, '${sig.pair}', ${sig.direction})">
+          Seguir Sinal
+        </button>
+      ` : ""}
+      ${isOpen ? `
+        <button class="btn btn-outline" onclick="resolveOracle(${sig.id})">
+          Verificar Oracle
+        </button>
+      ` : ""}
+      ${isLoss ? `
+        <button class="btn btn-green" onclick="claimReward(${sig.id})">
+          Resgatar Recompensa
+        </button>
+      ` : ""}
+      ${isExpired ? `
+        <button class="btn btn-outline" onclick="claimExpired(${sig.id})">
+          Recuperar Stake
+        </button>
+      ` : ""}
+    </div>
+  `;
+  return div;
+}
+
+// ══════════════════════════════════════════════
+// FOLLOW MODAL
+// ══════════════════════════════════════════════
+function openFollowModal(id, pair, direction) {
+  if (!userAddress) return showAlert("Conecte a carteira primeiro", "error");
+  pendingFollowId = id;
+  document.getElementById("modal-signal-id").textContent = `#${id}`;
+  document.getElementById("modal-pair").textContent      = pair;
+  document.getElementById("modal-direction").textContent = DIR_LABEL[direction];
+  document.getElementById("modal-stake").value           = "";
+  const overlay = document.getElementById("modal-overlay");
+  overlay.style.display = "flex";
+}
+
+function closeModal() {
+  document.getElementById("modal-overlay").style.display = "none";
+  pendingFollowId = null;
+}
+
+async function confirmFollow() {
+  const stake = document.getElementById("modal-stake").value;
+  if (!stake || parseFloat(stake) < 0.001) return showAlert("Stake mínimo: 0.001 ETH", "error");
+  closeModal();
+  await followSignal(pendingFollowId, stake);
+}
+
+// ══════════════════════════════════════════════
+// CRIAR SINAL
+// ══════════════════════════════════════════════
+async function createSignal() {
+  if (!userAddress) return showAlert("Conecte a carteira primeiro", "error");
+
+  const pair      = document.getElementById("f-pair").value;
+  const direction = parseInt(document.getElementById("f-direction").value);
+  const entry     = parseFloat(document.getElementById("f-entry").value);
+  const tp        = parseFloat(document.getElementById("f-tp").value);
+  const sl        = parseFloat(document.getElementById("f-sl").value);
+  const rsi       = parseInt(document.getElementById("f-rsi").value);
+  const stake     = document.getElementById("f-stake").value;
+
+  if (!entry || !tp || !sl || isNaN(rsi) || !stake) return showAlert("Preencha todos os campos", "error");
+  if (parseFloat(stake) < 0.005) return showAlert("Stake mínimo: 0.005 ETH", "error");
+  if (rsi < 0 || rsi > 100) return showAlert("RSI deve ser entre 0 e 100", "error");
+
+  if (direction === 0) {
+    if (tp <= entry) return showAlert("LONG: Take Profit deve ser maior que a entrada", "error");
+    if (sl >= entry) return showAlert("LONG: Stop Loss deve ser menor que a entrada", "error");
+  } else {
+    if (tp >= entry) return showAlert("SHORT: Take Profit deve ser menor que a entrada", "error");
+    if (sl <= entry) return showAlert("SHORT: Stop Loss deve ser maior que a entrada", "error");
+  }
+
+  try {
+    showAlert("Aguardando confirmação na carteira...", "info");
+    const tx = await contract.createSignal(
+      pair, direction,
+      toPrice(entry), toPrice(tp), toPrice(sl), rsi,
+      { value: ethers.utils.parseEther(stake) }
+    );
+    showAlert("Transação enviada. Aguardando confirmação...", "info");
+    await tx.wait();
+    showAlert(`Sinal criado com sucesso!`, "success");
+    await loadStats();
+    switchTab("sinais");
+  } catch (e) {
+    showAlert(e.reason || e.message || "Erro ao criar sinal", "error");
+  }
+}
+
+// ══════════════════════════════════════════════
+// SEGUIR SINAL
+// ══════════════════════════════════════════════
+async function followSignal(signalId, stake) {
+  try {
+    showAlert("Aguardando confirmação na carteira...", "info");
+    const tx = await contract.followSignal(signalId, { value: ethers.utils.parseEther(stake) });
+    showAlert("Transação enviada. Aguardando confirmação...", "info");
+    await tx.wait();
+    showAlert(`Seguindo sinal #${signalId}!`, "success");
+    await loadStats();
+    await loadSignals();
+  } catch (e) {
+    showAlert(e.reason || e.message || "Erro ao seguir sinal", "error");
+  }
+}
+
+// ══════════════════════════════════════════════
+// RESOLVER POR ORACLE
+// ══════════════════════════════════════════════
+async function resolveOracle(signalId) {
+  try {
+    showAlert(`Verificando preço Chainlink para o sinal #${signalId}...`, "info");
+    const tx = await contract.resolveByOracle(signalId);
+    await tx.wait();
+    showAlert(`Sinal #${signalId} resolvido!`, "success");
+    await loadSignals();
+  } catch (e) {
+    const msg = e.reason || e.message || "";
+    if (msg.includes("nao atingido")) showAlert("TP/SL ainda não foi atingido — o sinal continua aberto.", "info");
+    else showAlert(msg || "Erro ao verificar oracle", "error");
+  }
+}
+
+// ══════════════════════════════════════════════
+// CLAIM REWARD / EXPIRED
+// ══════════════════════════════════════════════
+async function claimReward(signalId) {
+  try {
+    showAlert("Resgatando recompensa...", "info");
+    const tx = await contract.claimReward(signalId);
+    await tx.wait();
+    showAlert("Recompensa creditada! Vá em Sacar para retirar.", "success");
+    await loadWithdrawal();
+  } catch (e) {
+    showAlert(e.reason || e.message || "Erro ao resgatar", "error");
+  }
+}
+
+async function claimExpired(signalId) {
+  try {
+    showAlert("Recuperando stake...", "info");
+    const tx = await contract.claimExpired(signalId);
+    await tx.wait();
+    showAlert("Stake recuperado! Vá em Sacar para retirar.", "success");
+    await loadWithdrawal();
+  } catch (e) {
+    showAlert(e.reason || e.message || "Erro ao recuperar stake", "error");
+  }
+}
+
+// ══════════════════════════════════════════════
+// POSIÇÕES DO USUÁRIO
+// ══════════════════════════════════════════════
+async function loadPositions() {
+  if (!contract || !userAddress) return;
+  const list = document.getElementById("positions-list");
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  try {
+    const total = (await contract.totalSignals()).toNumber();
+    const positions = [];
+
+    for (let i = 1; i <= total; i++) {
+      const pos = await contract.getPosition(i, userAddress);
+      if (pos.amount.gt(0)) {
+        const sig = await contract.getSignal(i);
+        positions.push({ sig, pos });
+      }
+    }
+
+    if (positions.length === 0) {
+      list.innerHTML = '<div class="empty"><div class="empty-icon">📂</div><p>Você não está seguindo nenhum sinal ainda.</p></div>';
+      return;
+    }
+
+    list.innerHTML = "";
+    for (const { sig, pos } of positions) {
+      const div = document.createElement("div");
+      div.className = "position-row";
+      const canClaim = (sig.status === 2 || sig.status === 3) && !pos.claimed;
+      div.innerHTML = `
+        <div class="position-info">
+          <div class="pair-label">${sig.pair} <span class="badge ${sig.direction === 0 ? "long" : "short"}" style="font-size:11px">${DIR_LABEL[sig.direction]}</span></div>
+          <div class="pos-detail">
+            Stake: <b>${fmtE(pos.amount)}</b> &nbsp;·&nbsp;
+            Status: <b class="${STATUS_CLASS[sig.status]}" style="color:${sig.status===1?"var(--green)":sig.status===2?"var(--red)":sig.status===3?"var(--yellow)":"var(--primary)"}">${STATUS_LABEL[sig.status]}</b>
+            ${pos.claimed ? ' &nbsp;·&nbsp; <span style="color:var(--green)">✓ Resgatado</span>' : ""}
+          </div>
+        </div>
+        <div>
+          ${canClaim && sig.status === 2 ? `<button class="btn btn-green" onclick="claimReward(${sig.id})">Resgatar</button>` : ""}
+          ${canClaim && sig.status === 3 ? `<button class="btn btn-outline" onclick="claimExpired(${sig.id})">Recuperar</button>` : ""}
+          ${!canClaim && sig.status === 0 ? `<span style="color:var(--muted);font-size:13px">Em aberto</span>` : ""}
+          ${sig.status === 1 ? `<span style="color:var(--red);font-size:13px">Provider ganhou</span>` : ""}
+          ${pos.claimed ? `<span style="color:var(--green);font-size:13px">✓</span>` : ""}
+        </div>
+      `;
+      list.appendChild(div);
+    }
+  } catch (e) {
+    list.innerHTML = `<div class="empty"><p style="color:var(--red)">Erro: ${e.message}</p></div>`;
+  }
+}
+
+// ══════════════════════════════════════════════
+// SACAR
+// ══════════════════════════════════════════════
+async function loadWithdrawal() {
+  if (!contract || !userAddress) return;
+  try {
+    const pending = await contract.pendingWithdrawal(userAddress);
+    const formatted = parseFloat(ethers.utils.formatEther(pending)).toFixed(4);
+    document.getElementById("pending-amount").textContent = `${formatted} ETH`;
+    const btn = document.getElementById("btn-withdraw");
+    btn.disabled = pending.isZero();
+  } catch {}
+}
+
+async function withdraw() {
+  try {
+    showAlert("Iniciando saque...", "info");
+    const tx = await contract.withdraw();
+    await tx.wait();
+    showAlert("Saque realizado com sucesso!", "success");
+    await loadWithdrawal();
+  } catch (e) {
+    showAlert(e.reason || e.message || "Erro ao sacar", "error");
+  }
+}
+</script>
+</body>
+</html>
