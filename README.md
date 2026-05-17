@@ -1,76 +1,100 @@
-# INC Network — Deploy Multi-Chain
+# INC Network — Proof-of-Signal
 
-Tesouraria: 0xb855fcF72730C703394317b5316f00404caf5417
-Taxa INC   : 1.5%
+Smart contract de staking de sinais on-chain com resolução automática via Chainlink Oracle.
 
-## Redes suportadas
+## Contrato em produção (Sepolia Testnet)
 
-| # | Rede            | Chain ID | Moeda | Custo est.  |
-|---|-----------------|----------|-------|-------------|
-| 1 | Ethereum        | 1        | ETH   | ~$80–150    |
-| 2 | Arbitrum        | 42161    | ETH   | ~$2–5       |
-| 3 | Polygon         | 137      | MATIC | ~$0.10      |
-| 4 | BNB Chain       | 56       | BNB   | ~$0.50      |
-| 5 | Optimism        | 10       | ETH   | ~$1–3       |
-| 6 | Avalanche       | 43114    | AVAX  | ~$0.50      |
-| 7 | Rootstock (BTC) | 30       | RBTC  | ~$0.10      |
+| Item | Valor |
+|---|---|
+| **Contrato** | `0x83F723a613a47cE2F0FB805bCA71C4AAA2F8d9EC` |
+| **Etherscan** | https://sepolia.etherscan.io/address/0x83F723a613a47cE2F0FB805bCA71C4AAA2F8d9EC#code |
+| **Versão** | v1.3 |
+| **Rede** | Sepolia Testnet (Chain ID: 11155111) |
+| **Treasury** | `0xc23dC262362C105774c0F05f7a166D3515310D03` |
+| **Taxa** | 1.5% |
 
-## Passo a passo
+## Chainlink Automation
 
-### 1. Instalar
+| Item | Valor |
+|---|---|
+| **Upkeep ID** | `30272584736006106819135222498325581770119847735504215194734786949589372446626` |
+| **Dashboard** | https://automation.chain.link/sepolia |
+| **LINK depositado** | 5 LINK |
+
+## Feeds Chainlink configurados (Sepolia)
+
+| Par | Feed |
+|---|---|
+| BTC/USDT | `0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43` |
+| ETH/USDT | `0x694AA1769357215DE4FAC081bf1f309aDC325306` |
+
+## Instalação
+
+```bash
 npm install
+```
 
-### 2. Testar local (grátis)
+## Testes (33/33 passando)
+
+```bash
 npx hardhat test
+```
 
-### 3. Sepolia (teste, sem custo)
-Pegue ETH de teste em sepoliafaucet.com
+## Deploy Sepolia
 
-Windows:
-  set PRIVATE_KEY=sua_key
-  npx hardhat run scripts/deploy-all.js --network sepolia
+Configure o `.env`:
+```
+PRIVATE_KEY=sua_chave_privada
+INC_TREASURY=endereco_da_treasury
+INC_OWNER=endereco_do_owner
+SEPOLIA_RPC_URL=https://1rpc.io/sepolia
+ETHERSCAN_KEY=sua_api_key
+```
 
-Mac/Linux:
-  export PRIVATE_KEY=sua_key
-  npx hardhat run scripts/deploy-all.js --network sepolia
+```bash
+npx hardhat run scripts/deploy.js --network sepolia
+```
 
-### 4. Deploy em cada rede principal
+## Verificação no Etherscan
 
-Windows:
-  set PRIVATE_KEY=sua_key
-  npx hardhat run scripts/deploy-all.js --network ethereum
-  npx hardhat run scripts/deploy-all.js --network arbitrum
-  npx hardhat run scripts/deploy-all.js --network polygon
-  npx hardhat run scripts/deploy-all.js --network bnb
-  npx hardhat run scripts/deploy-all.js --network optimism
-  npx hardhat run scripts/deploy-all.js --network avalanche
-  npx hardhat run scripts/deploy-all.js --network rootstock
+```bash
+npx hardhat verify --network sepolia ENDERECO_CONTRATO "TREASURY" "OWNER"
+```
 
-Mac/Linux:
-  export PRIVATE_KEY=sua_key
-  for net in ethereum arbitrum polygon bnb optimism avalanche rootstock; do
-    npx hardhat run scripts/deploy-all.js --network $net
-  done
+## Registro do Chainlink Automation
 
-### 5. Verificar código no explorer
+```bash
+npx hardhat run scripts/register-upkeep.js --network sepolia
+```
 
-npx hardhat verify --network REDE ENDERECO "0xb855fcF72730C703394317b5316f00404caf5417"
+## Deploy multi-chain (mainnet)
 
-Explorers:
-  Ethereum  → etherscan.io
-  Arbitrum  → arbiscan.io
-  Polygon   → polygonscan.com
-  BNB       → bscscan.com
-  Optimism  → optimistic.etherscan.io
-  Avalanche → snowscan.xyz
-  Rootstock → explorer.rsk.co
+```bash
+npx hardhat run scripts/deploy-all.js --network ethereum
+npx hardhat run scripts/deploy-all.js --network arbitrum
+npx hardhat run scripts/deploy-all.js --network polygon
+npx hardhat run scripts/deploy-all.js --network bnb
+npx hardhat run scripts/deploy-all.js --network optimism
+npx hardhat run scripts/deploy-all.js --network avalanche
+```
 
-## Fluxo de taxa
+## Segurança
 
-Usuário stake 1 ETH → contrato separa 1.5% → vai direto para 0xb855...
-O restante fica em escrow até WIN/LOSS/EXPIRADO.
+- `entryPrice` validado contra oracle Chainlink (tolerância 2%)
+- Treasury usa pull-payment — nunca bloqueia o protocolo
+- `emergencyResolve` com timelock de 1 dia (proposta + execução separadas)
+- Circuit breaker: `pause()` / `unpause()` disponível para o owner
+- ReentrancyGuard em todas as funções que movimentam ETH
+- Ownable2Step — transferência de owner exige confirmação
 
-## ⚠ Segurança
-Nunca salve a PRIVATE_KEY em arquivos.
-Sempre use variável de ambiente no terminal.
-Teste sempre na Sepolia antes de mainnet.
+## Redes suportadas para mainnet
+
+| Rede | Chain ID | Moeda |
+|---|---|---|
+| Ethereum | 1 | ETH |
+| Arbitrum | 42161 | ETH |
+| Polygon | 137 | MATIC |
+| BNB Chain | 56 | BNB |
+| Optimism | 10 | ETH |
+| Avalanche | 43114 | AVAX |
+| Rootstock | 30 | RBTC |

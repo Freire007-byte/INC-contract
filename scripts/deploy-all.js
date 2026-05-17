@@ -36,7 +36,7 @@ async function deployToNetwork() {
   console.log("  Deployando contrato...");
 
   const Factory  = await ethers.getContractFactory("INCNetwork");
-  const contract = await Factory.deploy(INC_TREASURY);
+  const contract = await Factory.deploy(INC_TREASURY, deployer.address);
   await contract.waitForDeployment();
 
   const address = await contract.getAddress();
@@ -47,7 +47,7 @@ async function deployToNetwork() {
   console.log(`  Gas usado: ${receipt.gasUsed.toString()}`);
   console.log(`  Explorer : ${info.explorer}${address}`);
 
-  return { network: net, label: info.label, address, explorer: info.explorer };
+  return { network: net, label: info.label, address, explorer: info.explorer, deployer: deployer.address };
 }
 
 async function main() {
@@ -68,7 +68,7 @@ async function main() {
     console.log(`  Taxa INC : 1.5%`);
     console.log("═".repeat(56));
     console.log("\n  PRÓXIMO PASSO — Verificar código-fonte:");
-    console.log(`  npx hardhat verify --network ${result.network} ${result.address} "${INC_TREASURY}"`);
+    console.log(`  npx hardhat verify --network ${result.network} ${result.address} "${INC_TREASURY}" "${result.deployer}"`);
   }
 }
 
